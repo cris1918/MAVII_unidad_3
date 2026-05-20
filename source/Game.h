@@ -19,7 +19,7 @@ private:
 
     // Entidades físicas
     Ground* rail; // Riel estático
-    b2Body* railBlock; // Bloque que se desplaza por el riel
+    PhysicsBox* railBlock; // Bloque que se desplaza por el riel
 
     b2PrismaticJoint* m_prismaticJoint; // Para guardar la dirección del prismatic joint y poder controlar el motor del joint
 

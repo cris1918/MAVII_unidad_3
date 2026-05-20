@@ -4,71 +4,66 @@ Game::Game() {
 	InitWindow(screenWidth, screenHeight, "MAVII - Unidad 3");
 	SetTargetFPS(60);
 
-	// Inicializar física
+	// MUNDO FÍSICO
 	b2Vec2 gravity(0.0f, 9.8f);
 	world = new b2World(gravity);
 
-	// Riel que va a estar en la parte superior de la pantalla
-	rail = new Ground(*world, 500.0f, 50.0f, 800.0f, 20.0f, SCALE, DARKGRAY);
+	// Riel superior
+	// Como es un static body reutilizo la clase que usaba para el suelo
+	rail = new Ground(*world, 500.0f, 85.0f, 800.0f, 20.0f, SCALE, DARKGRAY);
 
-	// Bloque móvil (para colocar sobre el riel)
-	b2BodyDef railBlockDef;
-	railBlockDef.type = b2_dynamicBody;
-	railBlockDef.position.Set(500.0f / SCALE, 85.0f / SCALE);
-	railBlock = world->CreateBody(&railBlockDef);
+	// Bloque móvil dinámico (para colocar sobre el riel)
+	// Utilizo la clase PhysicsBox
+	railBlock = new PhysicsBox(*world, 500.0f, 85.0f, 120.0f, 30.0f, SCALE, 0.0f, LIGHTGRAY);
 
-	b2PolygonShape railBlockShape;
-	railBlockShape.SetAsBox((120.0f / 2.0f) / SCALE, (30.0f / 2.0f) / SCALE);
-
-	b2FixtureDef railBlockFixture;
-	railBlockFixture.shape = &railBlockShape;
-	railBlockFixture.density = 2.0f;
-	railBlock->CreateFixture(&railBlockFixture);
-
-	// Prismatic joint
+	// PRISMATIC JOINT (estructura del riel)
 	b2PrismaticJointDef prismaticDef;
 	b2Vec2 axis(1.0f, 0.0f); // Sólo movimiento horizontal (x)
 
-	prismaticDef.Initialize(rail->GetBody(), railBlock, railBlock->GetWorldCenter(), axis);
+	// ------------------->(bodyA "riel",    bodyB "bloque móvil", anchor "centro del bloque",             axis "x")
+	prismaticDef.Initialize(rail->GetBody(), railBlock->GetBody(), railBlock->GetBody()->GetWorldCenter(), axis);
 
 	// Límites de desplazamiento
 	prismaticDef.enableLimit = true;
-	prismaticDef.lowerTranslation = -350.0f / SCALE;
-	prismaticDef.upperTranslation = 350.0f / SCALE;
+	prismaticDef.lowerTranslation = -350.0f / SCALE; // Límite máximo izquierdo
+	prismaticDef.upperTranslation = 350.0f / SCALE; // Límite máximo derecho
 
 	// Habilito el motor del prismatic joint
 	prismaticDef.enableMotor = true;
-	prismaticDef.maxMotorForce = 100.0f; // Velocidad máxima
-	prismaticDef.motorSpeed = 0.0f; // Por defecto apagado
+	prismaticDef.maxMotorForce = 100.0f; // Fuerza máxima del motor
+	prismaticDef.motorSpeed = 0.0f; // Por defecto apagado (sin velocidad)
 
-	// world->CreateJoint(&prismaticDef);
-	m_prismaticJoint = (b2PrismaticJoint*)world->CreateJoint(&prismaticDef); // Guardo el joint en la variable m_prismaticJoint
+	// Creo el prismatic joint en el mundo
+	// Guardo la referencia para poder controlar su velocidad en el update
+	m_prismaticJoint = (b2PrismaticJoint*)world->CreateJoint(&prismaticDef);
 
 
-	// Cajas colgantes
+	// CAJAS COLGANTES
+	// Utilizo la clase PhysicsBox
 	boxA = new PhysicsBox(*world, 400.0f, 300.0f, 50, 50, SCALE, 0, BROWN);
 	boxB = new PhysicsBox(*world, 600.0f, 300.0f, 50, 50, SCALE, 0, DARKBROWN);
 
-	// Distance Joint
-	// Soga caja A
+	// DISTANCE JOINT x2
+	// Soga caja A (izquierda)
 	b2DistanceJointDef jointDefA;
 	b2Vec2 anchorA(-40.0f / SCALE, 0.0f); // Punto izquierdo en el bloque móvil
 
-	// Inicializamos conectando el bloque móvil con la caja A
-	jointDefA.Initialize(railBlock, boxA->GetBody(), railBlock->GetWorldPoint(anchorA), boxA->GetBody()->GetWorldCenter());
+	// ---------------> (bodyA "bloque móvil", bodyB "boxA",    anchorA "punto específico del bloque móvil", anchorB "centro de boxA")
+	jointDefA.Initialize(railBlock->GetBody(), boxA->GetBody(), railBlock->GetBody()->GetWorldPoint(anchorA), boxA->GetBody()->GetWorldCenter());
 	world->CreateJoint(&jointDefA);
 
-	// Soga caja B
+	// Soga caja B (derecha)
 	b2DistanceJointDef jointDefB;
 	b2Vec2 anchorB(40.0f / SCALE, 0.0f); // Punto derecho en el bloque móvil
 
-	// Inicializamos conectando el bloque móvil con la caja B
-	jointDefB.Initialize(railBlock, boxB->GetBody(), railBlock->GetWorldPoint(anchorB), boxB->GetBody()->GetWorldCenter());
+	// ---------------> (bodyA "bloque móvil", bodyB "boxB",    anchorA "punto específico del bloque móvil",  anchorB "centro de boxB")
+	jointDefB.Initialize(railBlock->GetBody(), boxB->GetBody(), railBlock->GetBody()->GetWorldPoint(anchorB), boxB->GetBody()->GetWorldCenter());
 	world->CreateJoint(&jointDefB);
 }
 
 Game::~Game() {
 	delete rail;
+	delete railBlock;
 	delete boxA;
 	delete boxB;
 	delete world;
@@ -104,16 +99,9 @@ void Game::Draw() {
 	// Dibujo del riel
 	rail->Draw();
 
-	// Obtengo la posicion y la rotación del bloque móvil y lo convierto a píxeles
-	b2Vec2 getBlockPos = railBlock->GetPosition();
-	float BlockAngle = railBlock->GetAngle() * RAD2DEG;
-
-	// Posición central del bloque móvil
-	Vector2 blockPos = { getBlockPos.x * SCALE, getBlockPos.y * SCALE };
-
 	// Obtengo los puntos de anclaje y los convierto a pixeles
-	b2Vec2 getAnchorA = railBlock->GetWorldPoint(b2Vec2(-40.0f / SCALE, 0.0f));
-	b2Vec2 getAnchorB = railBlock->GetWorldPoint(b2Vec2(40.0f / SCALE, 0.0f));
+	b2Vec2 getAnchorA = railBlock->GetBody()->GetWorldPoint(b2Vec2(-40.0f / SCALE, 0.0f));
+	b2Vec2 getAnchorB = railBlock->GetBody()->GetWorldPoint(b2Vec2(40.0f / SCALE, 0.0f));
 
 	Vector2 anchorA = { getAnchorA.x * SCALE, getAnchorA.y * SCALE };
 	Vector2 anchorB = { getAnchorB.x * SCALE, getAnchorB.y * SCALE };
@@ -127,20 +115,17 @@ void Game::Draw() {
 	DrawLineV(anchorB, posBoxB, GRAY); // Derecha
 
 	// Dibujo el bloque móvil
-	Rectangle blockRect = { blockPos.x, blockPos.y, 120.0f, 30.0f };
-	Vector2 blockOrigin = { 120.0f / 2.0f, 30.0f / 2.0f };
-	DrawRectanglePro(blockRect, blockOrigin, BlockAngle, LIGHTGRAY);
+	railBlock->Draw();
+	// Dibujo las cajas colgantes
+	boxA->Draw();
+	boxB->Draw();
 
 	// Dibujo de los puntos/ruedas de anclaje
 	DrawCircleV(anchorA, 4, MAROON);
 	DrawCircleV(anchorB, 4, MAROON);
 
-	// Dibujo las cajas colgantes
-	boxA->Draw();
-	boxB->Draw();
-
 	// Información controles
-	DrawText("CONTROLES: Flecha izquierda / Derecha para mover el riel", 20, 20, 18, DARKGRAY);
+	DrawText("DESPLAZAMIENTO: Flecha izquierda / Derecha", 200, 20, 25, DARKGRAY);
 
 	EndDrawing();
 }
