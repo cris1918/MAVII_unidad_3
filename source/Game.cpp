@@ -47,17 +47,20 @@ Game::Game() {
 	// Soga caja A (izquierda)
 	b2DistanceJointDef jointDefA;
 	b2Vec2 anchorA(-40.0f / SCALE, 0.0f); // Punto izquierdo en el bloque móvil
+	
+	// Anclaje de la caja
+	b2Vec2 anchorBox(0.0f, -(25.0f / SCALE));
 
-	// ---------------> (bodyA "bloque móvil", bodyB "boxA",    anchorA "punto específico del bloque móvil", anchorB "centro de boxA")
-	jointDefA.Initialize(railBlock->GetBody(), boxA->GetBody(), railBlock->GetBody()->GetWorldPoint(anchorA), boxA->GetBody()->GetWorldCenter());
+	// ---------------> (bodyA "bloque móvil", bodyB "boxA",    anchorA "punto específico del bloque móvil", anchorB "centro borde superior de boxA")
+	jointDefA.Initialize(railBlock->GetBody(), boxA->GetBody(), railBlock->GetBody()->GetWorldPoint(anchorA), boxA->GetBody()->GetWorldPoint(anchorBox));
 	world->CreateJoint(&jointDefA);
 
 	// Soga caja B (derecha)
 	b2DistanceJointDef jointDefB;
 	b2Vec2 anchorB(40.0f / SCALE, 0.0f); // Punto derecho en el bloque móvil
 
-	// ---------------> (bodyA "bloque móvil", bodyB "boxB",    anchorA "punto específico del bloque móvil",  anchorB "centro de boxB")
-	jointDefB.Initialize(railBlock->GetBody(), boxB->GetBody(), railBlock->GetBody()->GetWorldPoint(anchorB), boxB->GetBody()->GetWorldCenter());
+	// ---------------> (bodyA "bloque móvil", bodyB "boxB",    anchorA "punto específico del bloque móvil",  anchorB "centro borde superior de boxB")
+	jointDefB.Initialize(railBlock->GetBody(), boxB->GetBody(), railBlock->GetBody()->GetWorldPoint(anchorB), boxB->GetBody()->GetWorldPoint(anchorBox));
 	world->CreateJoint(&jointDefB);
 }
 
@@ -85,7 +88,7 @@ void Game::Update() {
 	if (IsKeyDown(KEY_RIGHT)) { speed = motorSpeed; } // Velocidad hacia la derecha
 	else if (IsKeyDown(KEY_LEFT)) { speed = -motorSpeed; } // Velocidad hacia la izquierda (negativa)
 
-	// Aplico la velocidad al motor del joint
+	// Aplico la velocidad al motor del prismatic joint
 	m_prismaticJoint->SetMotorSpeed(speed);
 
 	// Avanzamos la simulación
@@ -99,18 +102,20 @@ void Game::Draw() {
 	// Dibujo del riel
 	rail->Draw();
 
-	// Obtengo los puntos de anclaje y los convierto a pixeles
+	// Obtengo los puntos de anclaje en metros (con su desfasaje del centro) y luego los convierto a pixeles
 	b2Vec2 getAnchorA = railBlock->GetBody()->GetWorldPoint(b2Vec2(-40.0f / SCALE, 0.0f));
 	b2Vec2 getAnchorB = railBlock->GetBody()->GetWorldPoint(b2Vec2(40.0f / SCALE, 0.0f));
 
 	Vector2 anchorA = { getAnchorA.x * SCALE, getAnchorA.y * SCALE };
 	Vector2 anchorB = { getAnchorB.x * SCALE, getAnchorB.y * SCALE };
 
-	// Obtengo la posición de las cajas colgantes
-	Vector2 posBoxA = { boxA->GetBody()->GetPosition().x * SCALE, boxA->GetBody()->GetPosition().y * SCALE };
-	Vector2 posBoxB = { boxB->GetBody()->GetPosition().x * SCALE, boxB->GetBody()->GetPosition().y * SCALE };
+	// Obtengo la posición de las cajas colgantes y lo convierto a píxeles
+	b2Vec2 anchorBox(0.0f, -(25.0f / SCALE));
 
-	// Dibujo las cuerdas
+	Vector2 posBoxA = { boxA->GetBody()->GetWorldPoint(anchorBox).x * SCALE, boxA->GetBody()->GetWorldPoint(anchorBox).y * SCALE };
+	Vector2 posBoxB = { boxB->GetBody()->GetWorldPoint(anchorBox).x * SCALE, boxB->GetBody()->GetWorldPoint(anchorBox).y * SCALE };
+
+	// Dibujo las cuerdas uniendo los anclajes del bloque móvil con las cajas
 	DrawLineV(anchorA, posBoxA, GRAY); // Izquierda
 	DrawLineV(anchorB, posBoxB, GRAY); // Derecha
 
@@ -120,9 +125,13 @@ void Game::Draw() {
 	boxA->Draw();
 	boxB->Draw();
 
-	// Dibujo de los puntos/ruedas de anclaje
+	// Dibujo los puntos de anclaje de las cuerdas al bloque móvil
 	DrawCircleV(anchorA, 4, MAROON);
 	DrawCircleV(anchorB, 4, MAROON);
+
+	// Dibujo los puntos de anclaje de las cajas
+	DrawCircleV(posBoxA, 4, MAROON);
+	DrawCircleV(posBoxB, 4, MAROON);
 
 	// Información controles
 	DrawText("DESPLAZAMIENTO: Flecha izquierda / Derecha", 200, 20, 25, DARKGRAY);
